@@ -2296,6 +2296,11 @@ int mmc_start_init(struct mmc *mmc)
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 			printf("Card did not respond to voltage select!\n");
 #endif
+			if (!strcmp(mmc->cfg->name,"sdhci@fe330000")) {
+				printf("reset %s clock to defaul value\n", mmc->cfg->name);
+				mmc_set_clock(mmc, MMC_HS200_MAX_DTR);
+			}
+
 			return -EOPNOTSUPP;
 		}
 	}
