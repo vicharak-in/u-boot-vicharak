@@ -36,6 +36,911 @@ DECLARE_GLOBAL_DATA_PTR;
 #define BLK_CNT(_num_bytes, _block_size)	\
 		((_num_bytes + _block_size - 1) / _block_size)
 
+#define MAX_OVERLAY_NAME_LENGTH 128
+struct hw_config {
+	int valid;
+
+	int fiq_debugger;
+	int edp, leds;
+	int i2c6, i2c7;
+	int uart0, uart4;
+	int i2s0;
+	int spi1, spi5;
+	int pwm0, pwm1, pwm3a;
+	int spdif;
+
+	int test_clkout2;
+
+	int gmac;
+
+	int overlay_count;
+	char **overlay_file;
+};
+
+static unsigned long hw_skip_comment(char *text)
+{
+	int i = 0;
+
+	if (*text == '#') {
+		while (*(text + i) != 0x00) {
+			if (*(text + (i++)) == 0x0a)
+				break;
+		}
+	}
+	return i;
+}
+
+static unsigned long hw_skip_line(char *text)
+{
+	if (*text == 0x0a)
+		return 1;
+	return 0;
+}
+
+static unsigned long get_intf_value(char *text, struct hw_config *hw_conf)
+{
+	int i = 0;
+
+	if (memcmp(text, "fiq_debugger=",  13) == 0) {
+		i = 13;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->fiq_debugger = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->fiq_debugger = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "edp=", 4) == 0) {
+		i = 4;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->edp = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->edp = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "leds=", 5) == 0) {
+		i = 5;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->leds = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->leds = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "i2c6=", 5) == 0) {
+		i = 5;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->i2c6 = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->i2c6 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "i2c7=", 5) == 0) {
+		i = 5;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->i2c7 = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->i2c7 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "uart0=", 6) == 0) {
+		i = 6;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->uart0 = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->uart0 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "uart4=", 6) == 0) {
+		i = 6;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->uart4 = 1;
+			hw_conf->spi1 = -1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->uart4 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "i2s0=", 5) == 0) {
+		i = 5;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->i2s0 = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->i2s0 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "spi1=", 5) == 0) {
+		i = 5;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->spi1 = 1;
+			hw_conf->uart4 = -1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->spi1 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "spi5=", 5) == 0) {
+		i = 5;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->spi5 = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->spi5 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "pwm0=", 5) == 0) {
+		i = 5;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->pwm0 = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->pwm0 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "pwm1=", 5) == 0) {
+		i = 5;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->pwm1 = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->pwm1 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "pwm3a=", 6) == 0) {
+		i = 6;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->pwm3a = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->pwm3a = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "spdif=", 6) == 0) {
+		i = 6;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->spdif = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->spdif = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else if (memcmp(text, "test_clkout2=", 13) == 0) {
+		i = 13;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->test_clkout2 = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->test_clkout2 = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+
+	} else {
+		goto invalid_line;
+	}
+
+	while (*(text + i) != 0x00) {
+		if (*(text + (i++)) == 0x0a)
+			break;
+	}
+	return i;
+
+invalid_line:
+	//It's not a legal line, skip it.
+	//printf("get_value: illegal line\n");
+	while (*(text + i) != 0x00) {
+		if (*(text + (i++)) == 0x0a)
+			break;
+	}
+	return i;
+}
+
+static unsigned long get_conf_value(char *text, struct hw_config *hw_conf)
+{
+	int i = 0;
+
+	if (memcmp(text, "eth_wakeup=", 11) == 0) {
+		i = 11;
+		if (memcmp(text + i, "on", 2) == 0) {
+			hw_conf->gmac = 1;
+			i = i + 2;
+		} else if (memcmp(text + i, "off", 3) == 0) {
+			hw_conf->gmac = -1;
+			i = i + 3;
+		} else {
+			goto invalid_line;
+		}
+	} else {
+		goto invalid_line;
+	}
+
+	while (*(text + i) != 0x00) {
+		if (*(text + (i++)) == 0x0a)
+			break;
+	}
+	return i;
+
+invalid_line:
+	//It's not a legal line, skip it.
+	//printf("get_value: illegal line\n");
+	while (*(text + i) != 0x00) {
+		if (*(text + (i++)) == 0x0a)
+			break;
+	}
+	return i;
+}
+
+static unsigned long get_append(char *text)
+{
+	int i = 0;
+	int append_len = 0;
+
+	while (*(text + i) != 0x00) {
+		if (*(text + i) == 0x0a) {
+			append_len = i;
+			i++;
+			break;
+		}
+		i++;
+	}
+
+	if (append_len) {
+		int len = 0;
+		char *append;
+
+		char *bootargs = env_get("bootargs");
+
+		if (bootargs)
+			len += strlen(bootargs);
+
+		append = (char *)calloc(append_len, sizeof(char));
+		memcpy(append, text, append_len);
+
+		len += append_len;
+
+		char *newbootargs = malloc(len + 2);
+		*newbootargs = '\0';
+
+		if (bootargs) {
+			strcpy(newbootargs, bootargs);
+			strcat(newbootargs, " ");
+		}
+
+		strcat(newbootargs, append);
+		printf("get append cmdline: %s\n", append);
+
+		env_set("bootargs", newbootargs);
+
+		free(append);
+		free(newbootargs);
+	}
+
+	return i;
+}
+
+static int set_file_conf(char *text, struct hw_config *hw_conf, int start_point, int file_ptr)
+{
+	char *ptr;
+	int name_length;
+
+	name_length = file_ptr - start_point;
+
+	if (name_length && name_length < MAX_OVERLAY_NAME_LENGTH) {
+		ptr = (char *)calloc(MAX_OVERLAY_NAME_LENGTH, sizeof(char));
+		memcpy(ptr, text + start_point, name_length);
+		ptr[name_length] = 0x00;
+		hw_conf->overlay_file[hw_conf->overlay_count] = ptr;
+		hw_conf->overlay_count += 1;
+	}
+	//Pass a space for next string.
+	start_point = file_ptr + 1;
+
+	return start_point;
+}
+
+void get_overlay_count(char *text, struct hw_config *hw_conf)
+{
+	int i = 0;
+	int start_point = 0;
+	int overlay_count = 0;
+	int name_length;
+
+	while (*(text + i) != 0x00) {
+		if (*(text + i) == 0x20 || *(text + i) == 0x0a) {
+			name_length = i - start_point;
+			if (name_length && name_length < MAX_OVERLAY_NAME_LENGTH)
+				overlay_count += 1;
+		}
+
+		if (*(text + i) == 0x20)
+			start_point = i + 1;
+		else if (*(text + i) == 0x0a)
+			break;
+		i++;
+	}
+
+	hw_conf->overlay_file = (char **)calloc(overlay_count, sizeof(char *));
+}
+
+static unsigned long get_overlay(char *text, struct hw_config *hw_conf)
+{
+	int i = 0;
+	int start_point = 0;
+
+	hw_conf->overlay_count = 0;
+	while (*(text + i) != 0x00) {
+		if (*(text + i) == 0x20 || *(text + i) == 0x0a)
+			start_point = set_file_conf(text, hw_conf, start_point, i);
+
+		if (*(text + i) == 0x0a) {
+			i++;
+			break;
+		}
+		i++;
+	}
+
+	return i;
+}
+
+static unsigned long hw_parse_property(char *text, struct hw_config *hw_conf)
+{
+	int i = 0;
+
+	if (memcmp(text, "intf:", 5) == 0) {
+		i = 5;
+		i = i + get_intf_value(text + i, hw_conf);
+	} else if (memcmp(text, "conf:",  5) == 0) {
+		i = 5;
+		i = i + get_conf_value(text + i, hw_conf);
+	} else if (memcmp(text, "overlay=", 8) == 0) {
+		i = 8;
+		get_overlay_count(text + i, hw_conf);
+		i = i + get_overlay(text + i, hw_conf);
+	} else {
+		printf("[conf] %s: illegal line\n", __func__);
+		//It's not a legal line, skip it.
+		while (*(text + i) != 0x00) {
+			if (*(text + (i++)) == 0x0a)
+				break;
+		}
+	}
+	return i;
+}
+
+static void parse_cmdline(void)
+{
+	unsigned long count, offset = 0, addr, size;
+	char *file_addr, *devnum;
+	static char *fs_argv[5];
+
+	int valid = 0;
+
+	devnum = env_get("devnum");
+	if (!devnum) {
+		printf("Can't get devnum\n");
+		goto end;
+	}
+
+	file_addr = env_get("cmdline_addr");
+	if (!file_addr) {
+		printf("Can't get cmdline_addr address\n");
+		goto end;
+	}
+
+	addr = simple_strtoul(file_addr, NULL, 16);
+	if (!addr)
+		printf("Can't set addr\n");
+
+	fs_argv[0] = "ext2load";
+	fs_argv[1] = "mmc";
+
+	if (!strcmp(devnum, "0")) {
+		fs_argv[2] = "0:7";
+	} else if (!strcmp(devnum, "1")) {
+		fs_argv[2] = "1:7";
+	} else {
+		printf("Invalid devnum\n");
+		goto end;
+	}
+
+	fs_argv[3] = file_addr;
+	fs_argv[4] = "cmdline.txt";
+
+	if (do_ext2load(NULL, 0, 5, fs_argv)) {
+		printf("[cmdline] do_ext2load fail\n");
+		goto end;
+	}
+
+	size = env_get_ulong("filesize", 16, 0);
+	if (!size) {
+		printf("[cmdline] Can't get filesize\n");
+		goto end;
+	}
+
+	valid = 1;
+
+	printf("cmdline.txt size = %lu\n", size);
+
+	*((char *)file_addr + size) = 0x00;
+
+	while (offset != size) {
+		count = hw_skip_comment((char *)(addr + offset));
+		if (count > 0) {
+			offset = offset + count;
+			continue;
+		}
+		count = hw_skip_line((char *)(addr + offset));
+		if (count > 0) {
+			offset = offset + count;
+			continue;
+		}
+		count = get_append((char *)(addr + offset));
+		if (count > 0) {
+			offset = offset + count;
+			continue;
+		}
+	}
+
+end:
+	printf("cmdline.txt valid = %d\n", valid);
+}
+
+static void parse_hw_config(struct hw_config *hw_conf)
+{
+	unsigned long count, offset = 0, addr, size;
+	char *file_addr, *devnum;
+	static char *fs_argv[5];
+
+	int valid = 0;
+
+	devnum = env_get("devnum");
+	if (!devnum) {
+		printf("Can't get devnum\n");
+		goto end;
+	}
+
+	file_addr = env_get("conf_addr");
+	if (!file_addr) {
+		printf("Can't get conf_addr address\n");
+		goto end;
+	}
+
+	addr = simple_strtoul(file_addr, NULL, 16);
+	if (!addr)
+		printf("Can't set addr\n");
+
+	fs_argv[0] = "ext2load";
+	fs_argv[1] = "mmc";
+
+	if (!strcmp(devnum, "0")) {
+		fs_argv[2] = "0:7";
+	} else if (!strcmp(devnum, "1")) {
+		fs_argv[2] = "1:7";
+	} else {
+		printf("Invalid devnum\n");
+		goto end;
+	}
+
+	fs_argv[3] = file_addr;
+	fs_argv[4] = "config.txt";
+
+	if (do_ext2load(NULL, 0, 5, fs_argv)) {
+		printf("[conf] do_ext2load fail\n");
+		goto end;
+	}
+
+	size = env_get_ulong("filesize", 16, 0);
+	if (!size) {
+		printf("[conf] Can't get filesize\n");
+		goto end;
+	}
+
+	valid = 1;
+	printf("config.txt size = %lu\n", size);
+
+	*((char *)file_addr + size) = 0x00;
+
+	while (offset != size) {
+		count = hw_skip_comment((char *)(addr + offset));
+		if (count > 0) {
+			offset = offset + count;
+			continue;
+		}
+		count = hw_skip_line((char *)(addr + offset));
+		if (count > 0) {
+			offset = offset + count;
+			continue;
+		}
+		count = hw_parse_property((char *)(addr + offset), hw_conf);
+		if (count > 0) {
+			offset = offset + count;
+			continue;
+		}
+	}
+end:
+	hw_conf->valid = valid;
+}
+
+static int set_hw_property(struct fdt_header *working_fdt, char *path, char *property, char *value, int length)
+{
+	int offset;
+	int ret;
+
+	printf("%s: %s %s %s\n", __func__, path, property, value);
+	offset = fdt_path_offset(working_fdt, path);
+	if (offset < 0) {
+		printf("libfdt fdt_path_offset() returned %s\n", fdt_strerror(offset));
+		return -1;
+	}
+	ret = fdt_setprop(working_fdt, offset, property, value, length);
+	if (ret < 0) {
+		printf("libfdt fdt_setprop(): %s\n", fdt_strerror(ret));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int flash_device_node(struct fdt_header *working_fdt, char *path, char *property, char *tag)
+{
+	int offset, len;
+	const fdt32_t *cell;
+
+	int spi1_clk[3] = {1, 9, 0};
+	int spi1_cs0[3] = {1, 10, 0};
+	int spi1_rx[3] = {1, 7, 0};
+	int spi1_tx[3] = {1, 8, 0};
+	int uart0_rts[3] = {2, 19, 0};
+	int test_clkout2[3] = {0, 8, 3};
+
+	int gpio0_a0[4] = {0, 0, 0, 200};
+	int test_clkout_gpio[4] = {0, 8, 0, 212};
+
+	int i, j;
+	u32 adj_val;
+	int get_spi1_clk, get_spi1_cs0;
+	int get_spi1_rx, get_spi1_tx;
+	int get_uart0_rts, get_test_clkout2;
+
+	printf("%s: %s %s\n", __func__, path, property);
+
+	offset = fdt_path_offset(working_fdt, path);
+	if (offset < 0) {
+		printf("libfdt fdt_path_offset() returned %s\n", fdt_strerror(offset));
+		return -1;
+	}
+
+	cell = fdt_getprop(working_fdt, offset, property, &len);
+	if (!cell) {
+		printf("libfdt fdt_getprop() fail\n");
+		return -1;
+	}
+
+	for (i = 0; i < len; i++) {
+		get_spi1_clk = 1;
+		get_spi1_cs0 = 1;
+		get_spi1_rx = 1;
+		get_spi1_tx = 1;
+		get_uart0_rts = 1;
+		get_test_clkout2 = 1;
+
+		for (j = 0; j < 3; j++) {
+			if (fdt32_to_cpu(cell[i + j]) != spi1_clk[j])
+				get_spi1_clk = 0;
+			if (fdt32_to_cpu(cell[i + j]) != spi1_cs0[j])
+				get_spi1_cs0 = 0;
+			if (fdt32_to_cpu(cell[i + j]) != spi1_rx[j])
+				get_spi1_rx = 0;
+			if (fdt32_to_cpu(cell[i + j]) != spi1_tx[j])
+				get_spi1_tx = 0;
+			if (fdt32_to_cpu(cell[i + j]) != uart0_rts[j])
+				get_uart0_rts = 0;
+			if (fdt32_to_cpu(cell[i + j]) != test_clkout2[j])
+				get_test_clkout2 = 0;
+		}
+
+		if (!strcmp(tag, "spi1") || !strcmp(tag, "uart4")) {
+			if (get_spi1_clk || get_spi1_cs0 || get_spi1_rx || get_spi1_tx) {
+				for (j = 0; j < 4; j++) {
+					adj_val = gpio0_a0[j];
+					adj_val = cpu_to_fdt32(adj_val);
+					fdt_setprop_inplace_namelen_partial(working_fdt, offset, property, strlen(property), (i + j) * 4, &adj_val, sizeof(adj_val));
+				}
+			}
+		}
+
+		if (!strcmp(tag, "uart0")) {
+			if (get_uart0_rts) {
+				for (j = 0; j < 4; j++) {
+					adj_val = gpio0_a0[j];
+					adj_val = cpu_to_fdt32(adj_val);
+					fdt_setprop_inplace_namelen_partial(working_fdt, offset, property, strlen(property), (i + j) * 4, &adj_val, sizeof(adj_val));
+				}
+			}
+		}
+
+		if (!strcmp(tag, "test_clkout2")) {
+			if (get_test_clkout2) {
+				for (j = 0; j < 4; j++) {
+					adj_val = test_clkout_gpio[j];
+					adj_val = cpu_to_fdt32(adj_val);
+					fdt_setprop_inplace_namelen_partial(working_fdt, offset, property, strlen(property), (i + j) * 4, &adj_val, sizeof(adj_val));
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+static struct fdt_header *resize_working_fdt(void)
+{
+	struct fdt_header *working_fdt;
+	unsigned long file_addr;
+	int err;
+
+	file_addr = env_get_ulong("fdt_addr_r", 16, 0);
+	if (!file_addr) {
+		printf("Can't get fdt address\n");
+		return NULL;
+	}
+
+	working_fdt = map_sysmem(file_addr, 0);
+	err = fdt_open_into(working_fdt, working_fdt, (1024 * 1024));
+	if (err != 0) {
+		printf("libfdt fdt_open_into(): %s\n", fdt_strerror(err));
+		return NULL;
+	}
+
+	printf("fdt magic number %x\n", working_fdt->magic);
+	printf("fdt size %u\n", fdt_totalsize(working_fdt));
+
+	return working_fdt;
+}
+
+#ifdef CONFIG_OF_LIBFDT_OVERLAY
+static int fdt_valid(struct fdt_header **blobp)
+{
+	const void *blob = *blobp;
+	int err;
+
+	if (!blob) {
+		printf("The address of the fdt is invalid (NULL).\n");
+		return 0;
+	}
+
+	err = fdt_check_header(blob);
+	if (!err)
+		return 1;	/* valid */
+
+	if (err < 0) {
+		printf("libfdt fdt_check_header(): %s", fdt_strerror(err));
+		/*
+		 * Be more informative on bad version.
+		 */
+		if (err == -FDT_ERR_BADVERSION) {
+			if (fdt_version(blob) < FDT_FIRST_SUPPORTED_VERSION)
+				printf(" - too old, fdt %d < %d",
+				       fdt_version(blob), FDT_FIRST_SUPPORTED_VERSION);
+			if (fdt_last_comp_version(blob) > FDT_LAST_SUPPORTED_VERSION)
+				printf(" - too new, fdt %d > %d",
+				       fdt_version(blob), FDT_LAST_SUPPORTED_VERSION);
+		}
+		printf("\n");
+
+		*blobp = NULL;
+		return 0;
+	}
+
+	return 1;
+}
+
+static int merge_dts_overlay(cmd_tbl_t *cmdtp, struct fdt_header *working_fdt, char *overlay_name)
+{
+	unsigned long addr;
+	char *file_addr, *devnum;
+	struct fdt_header *blob;
+	int ret;
+	char overlay_file[MAX_OVERLAY_NAME_LENGTH] = "overlays/";
+
+	static char *fs_argv[5];
+
+	devnum = env_get("devnum");
+	if (!devnum) {
+		printf("Can't get devnum\n");
+		goto fail;
+	}
+
+	file_addr = env_get("fdt_overlay_addr");
+	if (!file_addr) {
+		printf("Can't get fdt overlay address\n");
+		goto fail;
+	}
+
+	addr = simple_strtoul(file_addr, NULL, 16);
+
+	strcat(overlay_file, overlay_name);
+	strncat(overlay_file, ".dtbo", 6);
+
+	fs_argv[0] = "ext2load";
+	fs_argv[1] = "mmc";
+
+	if (!strcmp(devnum, "0")) {
+		fs_argv[2] = "0:7";
+	} else if (!strcmp(devnum, "1")) {
+		fs_argv[2] = "1:7";
+	} else {
+		printf("Invalid devnum\n");
+		goto fail;
+	}
+
+	fs_argv[3] = file_addr;
+	fs_argv[4] = overlay_file;
+
+	if (do_ext2load(NULL, 0, 5, fs_argv)) {
+		printf("%s: do_ext2load fail\n", __func__);
+		goto fail;
+	}
+
+	blob = map_sysmem(addr, 0);
+	if (!fdt_valid(&blob)) {
+		printf("%s: fdt_valid is invalid\n", __func__);
+		goto fail;
+	}
+	printf("fdt_valid\n");
+
+	ret = fdt_overlay_apply(working_fdt, blob);
+	if (ret) {
+		printf("%s: fdt_overlay_apply(): %s\n", __func__, fdt_strerror(ret));
+		goto fail;
+	}
+	printf("fdt_overlay_apply success\n");
+
+	return 0;
+
+fail:
+	return -1;
+}
+#endif
+
+static void handle_hw_conf(cmd_tbl_t *cmdtp, struct fdt_header *working_fdt, struct hw_config *hw_conf)
+{
+	if (!working_fdt) {
+		printf("working_fdt is NULL\n");
+		return;
+	}
+
+#ifdef CONFIG_OF_LIBFDT_OVERLAY
+	int i;
+
+	for (i = 0; i < hw_conf->overlay_count; i++) {
+		if (merge_dts_overlay(cmdtp, working_fdt, hw_conf->overlay_file[i]) < 0)
+			printf("Can't merge dts overlay: %s\n", hw_conf->overlay_file[i]);
+		else
+			printf("Merged dts overlay: %s\n", hw_conf->overlay_file[i]);
+
+		free(hw_conf->overlay_file[i]);
+	}
+	free(hw_conf->overlay_file);
+#endif
+
+	if (hw_conf->fiq_debugger == 1)
+		set_hw_property(working_fdt, "/fiq-debugger", "status", "okay", 5);
+	else if (hw_conf->fiq_debugger == -1)
+		set_hw_property(working_fdt, "/fiq-debugger", "status", "disabled", 9);
+
+	if (hw_conf->i2c6 == 1)
+		set_hw_property(working_fdt, "/i2c@ff150000", "status", "okay", 5);
+	else if (hw_conf->i2c6 == -1)
+		set_hw_property(working_fdt, "/i2c@ff150000", "status", "disabled", 9);
+	if (hw_conf->i2c7 == 1)
+		set_hw_property(working_fdt, "/i2c@ff160000", "status", "okay", 5);
+	else if (hw_conf->i2c7 == -1)
+		set_hw_property(working_fdt, "/i2c@ff160000", "status", "disabled", 9);
+
+	if (hw_conf->edp == 1)
+		set_hw_property(working_fdt, "/edp@ff970000", "status", "okay", 5);
+	else if (hw_conf->edp == -1)
+		set_hw_property(working_fdt, "/edp@ff970000", "status", "disabled", 9);
+
+	if (hw_conf->leds == 1)
+		set_hw_property(working_fdt, "/gpio-leds", "status", "okay", 5);
+	else if (hw_conf->leds == -1)
+		set_hw_property(working_fdt, "/gpio-leds", "status", "disabled", 9);
+
+	if (hw_conf->uart0 == 1) {
+		set_hw_property(working_fdt, "/serial@ff180000", "status", "okay", 5);
+		flash_device_node(working_fdt, "/pinctrl/gpio_init_config/gpio_init", "rockchip,pins", "uart0");
+	} else if (hw_conf->uart0 == -1) {
+		set_hw_property(working_fdt, "/serial@ff180000", "status", "disabled", 9);
+	}
+
+	if (hw_conf->uart4 == 1) {
+		set_hw_property(working_fdt, "/serial@ff370000", "status", "okay", 5);
+		flash_device_node(working_fdt, "/pinctrl/gpio_init_config/gpio_init", "rockchip,pins", "uart4");
+	} else if (hw_conf->uart4 == -1) {
+		set_hw_property(working_fdt, "/serial@ff370000", "status", "disabled", 9);
+	}
+
+	if (hw_conf->i2s0 == 1)
+		set_hw_property(working_fdt, "/i2s@ff880000", "status", "okay", 5);
+	else if (hw_conf->i2s0 == -1)
+		set_hw_property(working_fdt, "/i2s@ff880000", "status", "disabled", 9);
+
+	if (hw_conf->spi1 == 1) {
+		set_hw_property(working_fdt, "/spi@ff1d0000", "status", "okay", 5);
+		flash_device_node(working_fdt, "/pinctrl/gpio_init_config/gpio_init", "rockchip,pins", "spi1");
+	} else if (hw_conf->spi1 == -1) {
+		set_hw_property(working_fdt, "/spi@ff1d0000", "status", "disabled", 9);
+	}
+
+	if (hw_conf->spi5 == 1)
+		set_hw_property(working_fdt, "/spi@ff200000", "status", "okay", 5);
+	else if (hw_conf->spi5 == -1)
+		set_hw_property(working_fdt, "/spi@ff200000", "status", "disabled", 9);
+
+	if (hw_conf->pwm0 == 1)
+		set_hw_property(working_fdt, "/pwm@ff420000", "status", "okay", 5);
+	else if (hw_conf->pwm0 == -1)
+		set_hw_property(working_fdt, "/pwm@ff420000", "status", "disabled", 9);
+	if (hw_conf->pwm1 == 1)
+		set_hw_property(working_fdt, "/pwm@ff420010", "status", "okay", 5);
+	else if (hw_conf->pwm1 == -1)
+		set_hw_property(working_fdt, "/pwm@ff420010", "status", "disabled", 9);
+	if (hw_conf->pwm3a == 1)
+		set_hw_property(working_fdt, "/pwm@ff420030", "status", "okay", 5);
+	else if (hw_conf->pwm3a == -1)
+		set_hw_property(working_fdt, "/pwm@ff420030", "status", "disabled", 9);
+
+	if (hw_conf->spdif == 1)
+		set_hw_property(working_fdt, "/spdif@ff870000", "status", "okay", 5);
+	else if (hw_conf->spdif == -1)
+		set_hw_property(working_fdt, "/spdif@ff870000", "status", "disabled", 9);
+
+	/* Flash test_clkout2 to gpio as default status. */
+	if (hw_conf->test_clkout2 != 1)
+		flash_device_node(working_fdt, "/pinctrl/testclk/test-clkout2", "rockchip,pins", "test_clkout2");
+
+	if (hw_conf->gmac == 1)
+		set_hw_property(working_fdt, "/ethernet@fe300000", "wakeup-enable", "1", 2);
+	else if (hw_conf->gmac == -1)
+		set_hw_property(working_fdt, "/ethernet@fe300000", "wakeup-enable", "0", 2);
+}
+
 static char andr_tmp_str[ANDR_BOOT_ARGS_SIZE + 1];
 static u32 android_kernel_comp_type = IH_COMP_NONE;
 
@@ -238,8 +1143,8 @@ int android_image_get_kernel(const struct andr_img_hdr *hdr, int verify,
 		len += strlen(cmdline);
 	}
 
-	char *rootmmc1 = "root=/dev/mmcblk1p8"; /* SDcard Boot */
-	char *rootmmc2 = "root=/dev/mmcblk2p8"; /* eMMC Boot */
+	char *rootmmc1 = "root=/dev/mmcblk0p8"; /* SDcard Boot */
+	char *rootmmc2 = "root=/dev/mmcblk1p8"; /* eMMC Boot */
 
 	char *bootargs = env_get("bootargs");
 	if (bootargs)
@@ -722,6 +1627,38 @@ static int android_image_separate(struct andr_img_hdr *hdr,
 	ulong bstart;
 	int ret;
 
+	parse_cmdline();
+
+	struct fdt_header *working_fdt;
+	struct hw_config hw_conf;
+
+	memset(&hw_conf, 0, sizeof(struct hw_config));
+	parse_hw_config(&hw_conf);
+
+	printf("config.txt valid = %d\n", hw_conf.valid);
+	if (hw_conf.valid == 1) {
+		printf("config on: 1, config off: -1, no config: 0\n");
+		printf("intf.fiq_debugger = %d\n", hw_conf.fiq_debugger);
+		printf("intf.edp = %d\n", hw_conf.edp);
+		printf("intf.leds = %d\n", hw_conf.leds);
+		printf("intf.i2c6 = %d\n", hw_conf.i2c6);
+		printf("intf.i2c7 = %d\n", hw_conf.i2c7);
+		printf("intf.uart0 = %d\n", hw_conf.uart0);
+		printf("intf.uart4 = %d\n", hw_conf.uart4);
+		printf("intf.i2s0 = %d\n", hw_conf.i2s0);
+		printf("intf.spi1 = %d\n", hw_conf.spi1);
+		printf("intf.spi5 = %d\n", hw_conf.spi5);
+		printf("intf.pwm0 = %d\n", hw_conf.pwm0);
+		printf("intf.pwm1 = %d\n", hw_conf.pwm1);
+		printf("intf.pwm3a = %d\n", hw_conf.pwm3a);
+		printf("intf.spdif = %d\n", hw_conf.spdif);
+		printf("intf.test_clkout2 = %d\n", hw_conf.test_clkout2);
+		printf("conf.gmac = %d\n", hw_conf.gmac);
+
+		for (int i = 0; i < hw_conf.overlay_count; i++)
+			printf("get overlay name: %s\n", hw_conf.overlay_file[i]);
+	}
+
 	if (android_image_check_header(hdr)) {
 		printf("Bad android image header\n");
 		return -EINVAL;
@@ -799,6 +1736,12 @@ static int android_image_separate(struct andr_img_hdr *hdr,
 
 	/* 2. Disable fdt/ramdisk relocation, it saves boot time */
 	env_set("bootm-no-reloc", "y");
+
+	working_fdt = resize_working_fdt();
+	if (working_fdt) {
+		if (hw_conf.valid)
+			handle_hw_conf(NULL, working_fdt, &hw_conf);
+	}
 
 	return 0;
 }
