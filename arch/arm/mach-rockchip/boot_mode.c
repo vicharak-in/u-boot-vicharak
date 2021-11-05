@@ -9,6 +9,8 @@
 #include <malloc.h>
 #include <asm/io.h>
 #include <asm/arch/boot_mode.h>
+#include <usb.h>
+#include <dm/device.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -230,6 +232,55 @@ int rockchip_get_boot_mode(void)
 int setup_boot_mode(void)
 {
 	char env_preboot[256] = {0};
+	int dev_type;
+	int devnum;
+	struct blk_desc *dev_desc;
+	const char *storage_node;
+	const char *bootargs;
+	char boot_options[1024] = {0};
+
+	dev_type = get_bootdev_type();
+	devnum = env_get_ulong("devnum", 10, 0);
+
+	dev_desc = blk_get_devnum_by_type(dev_type, devnum);
+	if (!dev_desc) {
+		printf("%s: Can't find dev_desc!\n", __func__);
+	}
+
+	if (dev_type == IF_TYPE_MMC) {
+		storage_node = dev_desc->bdev->parent->node.np->full_name;
+	} else if (dev_type == IF_TYPE_USB) {
+		struct udevice *usb_bus;
+		usb_bus = usb_get_bus(dev_desc->bdev);
+		storage_node = usb_bus->node.np->full_name;
+	} else if (dev_type == IF_TYPE_SCSI) {
+		struct udevice *sata_dev = dev_desc->bdev;
+		struct udevice *sata_bus;
+		for (sata_bus = sata_dev; sata_bus && device_get_uclass_id(sata_bus) != UCLASS_AHCI; )
+			sata_bus = sata_bus->parent;
+		if (!sata_bus) {
+			/* By design this cannot happen */
+			assert(sata_bus);
+		}
+		storage_node = sata_bus->node.np->full_name;
+	} else if (dev_type == IF_TYPE_NVME) {
+		struct udevice *nvme_dev = dev_desc->bdev;
+		struct udevice *nvme_bus;
+		for (nvme_bus = nvme_dev; nvme_bus && device_get_uclass_id(nvme_bus) != UCLASS_PCI; )
+			nvme_bus = nvme_bus->parent;
+		nvme_bus = nvme_bus->parent;
+		if (!nvme_bus) {
+			/* By design this cannot happen */
+			assert(nvme_bus);
+		}
+		storage_node = nvme_bus->node.np->full_name;
+	} else {
+		storage_node = "null";
+	}
+	bootargs = env_get("bootargs");
+	snprintf(boot_options, sizeof(boot_options),
+		"%s storagenode=%s ", bootargs, storage_node);
+	env_update("bootargs", boot_options);
 
 	switch (rockchip_get_boot_mode()) {
 	case BOOT_MODE_BOOTLOADER:

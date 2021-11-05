@@ -129,7 +129,7 @@ finish:
 	       env_get("devtype"), env_get("devnum"));
 }
 
-static int get_bootdev_type(void)
+int get_bootdev_type(void)
 {
 	char *boot_media = NULL, *devtype = NULL;
 	char boot_options[128] = {0};
