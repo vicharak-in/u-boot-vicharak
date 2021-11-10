@@ -238,9 +238,14 @@ int android_image_get_kernel(const struct andr_img_hdr *hdr, int verify,
 		len += strlen(cmdline);
 	}
 
+	char *rootmmc1 = "root=/dev/mmcblk1p8"; /* SDcard Boot */
+	char *rootmmc2 = "root=/dev/mmcblk2p8"; /* eMMC Boot */
+
 	char *bootargs = env_get("bootargs");
 	if (bootargs)
 		len += strlen(bootargs);
+
+	len += strlen(rootmmc1);
 
 	char *newbootargs = malloc(len + 2);
 	if (!newbootargs) {
@@ -255,6 +260,15 @@ int android_image_get_kernel(const struct andr_img_hdr *hdr, int verify,
 	}
 	if (cmdline)
 		strcat(newbootargs, cmdline);
+
+	char *devnum = env_get("devnum");
+	if (!strcmp(devnum, "0")) {
+		printf("devnum=0, boot from eMMC\n");
+		strcat(newbootargs, rootmmc2);
+	} else if (!strcmp(devnum, "1")) {
+		printf("devnum=1, boot from SD\n");
+		strcat(newbootargs, rootmmc1);
+	}
 
 	env_set("bootargs", newbootargs);
 
