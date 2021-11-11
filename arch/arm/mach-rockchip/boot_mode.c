@@ -245,6 +245,7 @@ int setup_boot_mode(void)
 	dev_desc = blk_get_devnum_by_type(dev_type, devnum);
 	if (!dev_desc) {
 		printf("%s: Can't find dev_desc!\n", __func__);
+		return -1;
 	}
 
 	if (dev_type == IF_TYPE_MMC) {
