@@ -1327,7 +1327,7 @@ static int load_kernel_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	return 0;
 }
 
-static int rockchip_read_distro_logo(void *logo_addr, int size)
+static int rockchip_read_distro_logo(void *logo_addr, const char *bmp_name, int size)
 {
 	const char *cmd = "part list ${devtype} ${devnum} -bootable devplist";
 	char *devnum, *devtype, *devplist;
@@ -1358,13 +1358,13 @@ static int rockchip_read_distro_logo(void *logo_addr, int size)
 	fs_argv[1] = devtype,
 	fs_argv[2] = devnum_part;
 	fs_argv[3] = logo_hex_str;
-	fs_argv[4] = "logo.bmp";
+	fs_argv[4] = (char *)bmp_name;
 	fs_argv[5] = header_size_str;
 
 	if (do_load(NULL, 0, 6, fs_argv, FS_TYPE_ANY))
 		return -EIO;
 
-	printf("logo(Distro): logo.bmp\n");
+	printf("logo(Distro): %s\n", bmp_name);
 
 	return 0;
 }
@@ -1408,7 +1408,7 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
     }
     else
 #endif
-    if (!rockchip_read_distro_logo(header, RK_BLK_SIZE)) {
+    if (!rockchip_read_distro_logo(header, bmp_name, RK_BLK_SIZE)) {
         logo_source = FROM_DISTRO;
     } else {
         free(header);
@@ -1448,7 +1448,7 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	} else
 #endif
 	if (logo_source == FROM_DISTRO) {
-		ret = rockchip_read_distro_logo(pdst, size);
+		ret = rockchip_read_distro_logo(pdst, bmp_name, size);
 		if (ret) {
 			printf("failed to load logo.bmp\n");
 			ret = -ENOENT;
