@@ -57,6 +57,8 @@ fit-dtb.blob*
 #
 # Generated files
 #
+/LOG
+/fit/
 /spl/
 /tpl/
 /defconfig
@@ -108,3 +110,9 @@ __pycache__
 
 # moveconfig database
 /moveconfig.db
+
+# simple-bin
+simple-bin.*
+
+# rksd
+rksd

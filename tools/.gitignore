@@ -37,3 +37,9 @@
 /version.h
 /xway-swap-bytes
 /boot
+/trust_merger
+/boot_merger
+/loaderimage
+/checksum
+/resource_tool
+/bmp2gray16
