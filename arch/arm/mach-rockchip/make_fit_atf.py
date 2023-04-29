@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 """
 A script to generate FIT image source for rockchip boards
 with ARM Trusted Firmware
