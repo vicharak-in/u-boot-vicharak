@@ -11,7 +11,7 @@ SUPPORT_LIST=`ls configs/*[r,p][x,v,k][0-9][0-9]*_defconfig`
 CMD_ARGS=$1
 
 ########################################### User can modify #############################################
-RKBIN_TOOLS=../rkbin/tools
+RKBIN_TOOLS=rkbin/tools
 CROSS_COMPILE_ARM32=arm-linux-gnueabihf-
 CROSS_COMPILE_ARM64=aarch64-linux-gnu-
 ########################################### User not touch #############################################
