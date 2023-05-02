@@ -1554,6 +1554,35 @@ int rockchip_show_logo(void)
 	return ret;
 }
 
+int rockchip_vop_dump(const char *cmd)
+{
+	struct display_state *state;
+	struct crtc_state *crtc_state;
+	struct rockchip_crtc *crtc;
+	const struct rockchip_crtc_funcs *crtc_funcs;
+	int ret = -EINVAL;
+
+	list_for_each_entry(state, &rockchip_display_list, head) {
+		if (!state->is_init)
+			continue;
+		crtc_state = &state->crtc_state;
+		crtc = crtc_state->crtc;
+		crtc_funcs = crtc->funcs;
+
+		if (!cmd)
+			ret = crtc_funcs->active_regs_dump(state);
+		else if (!strcmp(cmd, "a") || !strcmp(cmd, "all"))
+			ret = crtc_funcs->regs_dump(state);
+		if (!ret)
+			break;
+	}
+
+	if (ret)
+		ret = CMD_RET_USAGE;
+
+	return ret;
+}
+
 enum {
 	PORT_DIR_IN,
 	PORT_DIR_OUT,
@@ -1595,13 +1624,12 @@ static const struct device_node *rockchip_of_graph_get_port_parent(ofnode port)
 	return ofnode_to_np(parent);
 }
 
-static const struct device_node *rockchip_of_graph_get_remote_node(ofnode node, int port,
-								   int endpoint)
+const struct device_node *
+rockchip_of_graph_get_endpoint_by_regs(ofnode node, int port, int endpoint)
 {
 	const struct device_node *port_node;
 	ofnode ep;
 	u32 reg;
-	uint phandle;
 
 	port_node = rockchip_of_graph_get_port_by_id(node, port);
 	if (!port_node)
@@ -1617,7 +1645,21 @@ static const struct device_node *rockchip_of_graph_get_remote_node(ofnode node, 
 	if (!ofnode_valid(ep))
 		return NULL;
 
-	if (ofnode_read_u32(ep, "remote-endpoint", &phandle))
+	return ofnode_to_np(ep);
+}
+
+static const struct device_node *
+rockchip_of_graph_get_remote_node(ofnode node, int port, int endpoint)
+{
+	const struct device_node *ep_node;
+	ofnode ep;
+	uint phandle;
+
+	ep_node = rockchip_of_graph_get_endpoint_by_regs(node, port, endpoint);
+	if (!ep_node)
+		return NULL;
+
+	if (ofnode_read_u32(np_to_ofnode(ep_node), "remote-endpoint", &phandle))
 		return NULL;
 
 	ep = ofnode_get_by_phandle(phandle);
@@ -2348,6 +2390,19 @@ static int do_rockchip_show_bmp(cmd_tbl_t *cmdtp, int flag, int argc,
 	return 0;
 }
 
+static int do_rockchip_vop_dump(cmd_tbl_t *cmdtp, int flag, int argc,
+				char *const argv[])
+{
+	int ret;
+
+	if (argc < 1 || argc > 2)
+		return CMD_RET_USAGE;
+
+	ret = rockchip_vop_dump(argv[1]);
+
+	return ret;
+}
+
 U_BOOT_CMD(
 	rockchip_show_logo, 1, 1, do_rockchip_logo_show,
 	"load and display log from resource partition",
@@ -2358,4 +2413,10 @@ U_BOOT_CMD(
 	rockchip_show_bmp, 2, 1, do_rockchip_show_bmp,
 	"load and display bmp from resource partition",
 	"    <bmp_name>"
+);
+
+U_BOOT_CMD(
+	vop_dump, 2, 1, do_rockchip_vop_dump,
+	"dump vop regs",
+	" [a/all]"
 );

@@ -38,14 +38,13 @@
 };
 
 &cru {
+	/delete-property/ assigned-clocks;
+	/delete-property/ assigned-clock-rates;
 	u-boot,dm-spl;
 	status = "okay";
 };
 
 &crypto {
-	clocks = <&scmi_clk SCMI_CORE_CRYPTO>, <&scmi_clk SCMI_PKA_CRYPTO>;
-	clock-names = "sclk", "pka";
-	clock-frequency = <200000000>, <300000000>;
 	u-boot,dm-spl;
 	status = "okay";
 };
@@ -99,6 +98,8 @@
 &sdhci {
 	bus-width = <8>;
 	u-boot,dm-spl;
+	/delete-property/ assigned-clocks;
+	/delete-property/ assigned-clock-rates;
 	/delete-property/ pinctrl-names;
 	/delete-property/ pinctrl-0;
 	mmc-hs400-1_8v;
