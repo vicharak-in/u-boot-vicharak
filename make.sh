@@ -7,7 +7,7 @@
 
 set -e
 JOB=$(nproc)
-SUPPORT_LIST=`ls configs/*[r,p][x,v,k][0-9][0-9]*_defconfig`
+SUPPORT_LIST=$(ls configs/*[r,p][x,v,k][0-9][0-9]*_defconfig)
 CMD_ARGS=$1
 
 ########################################### User can modify #############################################
@@ -39,7 +39,7 @@ PLAT_UBOOT_SIZE=
 PLAT_TRUST_SIZE=
 PLAT_TYPE="RKFW" # default
 
-SRCTREE=`pwd`
+SRCTREE=$(pwd)
 SCRIPT_FIT="${SRCTREE}/scripts/fit.sh"
 
 SCRIPT_ATF="${SRCTREE}/scripts/atf.sh"
@@ -52,8 +52,7 @@ SCRIPT_CHECKCONFIG="${SRCTREE}/scripts/check-rkconfig.sh"
 CC_FILE=".cc"
 REP_DIR="./rep"
 #########################################################################################################
-function help()
-{
+function help() {
 	echo
 	echo "Usage:"
 	echo "	./make.sh [board|sub-command]"
@@ -95,160 +94,160 @@ function help()
 	echo "	./make.sh sym                      --- cat u-boot.sym"
 }
 
-function filt_val()
-{
+function filt_val() {
 	sed -n "/${1}=/s/${1}=//p" $2 | tr -d '\r' | tr -d '"'
 }
 
-function prepare()
-{
+function prepare() {
 	if [ -d ${RKBIN_TOOLS} ]; then
-		absolute_path=$(cd `dirname ${RKBIN_TOOLS}`; pwd)
+		absolute_path=$(
+			cd $(dirname ${RKBIN_TOOLS})
+			pwd
+		)
 		RKBIN=${absolute_path}
 	else
 		echo "ERROR: No ../rkbin repository"
 		exit 1
 	fi
 
-	if grep -Eq ''^CONFIG_ARM64=y'|'^CONFIG_ARM64_BOOT_AARCH32=y'' .config ; then
+	if grep -Eq ''^CONFIG_ARM64=y'|'^CONFIG_ARM64_BOOT_AARCH32=y'' .config; then
 		ARM64_TRUSTZONE="y"
 	fi
 
-	if grep  -q '^CONFIG_ROCKCHIP_FIT_IMAGE_PACK=y' .config ; then
+	if grep -q '^CONFIG_ROCKCHIP_FIT_IMAGE_PACK=y' .config; then
 		PLAT_TYPE="FIT"
-	elif grep  -q '^CONFIG_SPL_DECOMP_HEADER=y' .config ; then
+	elif grep -q '^CONFIG_SPL_DECOMP_HEADER=y' .config; then
 		PLAT_TYPE="DECOMP"
 	fi
 }
 
-function process_args()
-{
+function process_args() {
 	while [ $# -gt 0 ]; do
 		case $1 in
-			*help|--h|-h)
-				help
-				exit 0
-				;;
-			CROSS_COMPILE=*)  # set CROSS_COMPILE
-				ARG_COMPILE="y"
-				CROSS_COMPILE_ARM32=${1#*=}
-				CROSS_COMPILE_ARM64=${1#*=}
-				if [ ${CMD_ARGS} == $1 ]; then
-					shift 1
-					CMD_ARGS=$1
-				else
-					shift 1
-				fi
-				;;
-			# '': build with exist .config
-			# loader|trust|uboot: pack image
-			# debug*|map|sym|elf*|nm: debug command
-			# env: build env tool
-			# itb: pack itb image
-			# fit: pack non-secure uboot.img && boot.img
-			''|loader|trust|uboot|debug*|itb|env|fit|map|sym|elf*|nm)
-				if [ "$2" == "spl" -o "$2" == "tpl" ]; then
-					ARG_TSPL=$2
-					shift 1
-				fi
+		*help | --h | -h)
+			help
+			exit 0
+			;;
+		CROSS_COMPILE=*) # set CROSS_COMPILE
+			ARG_COMPILE="y"
+			CROSS_COMPILE_ARM32=${1#*=}
+			CROSS_COMPILE_ARM64=${1#*=}
+			if [ ${CMD_ARGS} == $1 ]; then
 				shift 1
-				;;
-			# trust/loader ini files for packing trust.img/loader.img
-			*.ini|*.INI)
-				if [ ! -f $1 ]; then
-					echo "ERROR: No $1"
-				fi
-				if grep -q 'CODE471_OPTION' $1 ; then
-					ARG_INI_LOADER=$1
-				elif grep -Eq ''BL31_OPTION'|'TOS'' $1 ; then
-					ARG_INI_TRUST=$1
-				fi
+				CMD_ARGS=$1
+			else
 				shift 1
-				;;
-			--sz-trust) # set trust size
-				ARG_TRUST_SIZE="--size $2 $3"
-				shift 3
-				;;
-			--sz-uboot) # set uboot size
-				ARG_UBOOT_SIZE="--size $2 $3"
-				shift 3
-				;;
-			--raw-compile)  # FIT: build but not pack image
-				ARG_RAW_COMPILE="y"
+			fi
+			;;
+		# '': build with exist .config
+		# loader|trust|uboot: pack image
+		# debug*|map|sym|elf*|nm: debug command
+		# env: build env tool
+		# itb: pack itb image
+		# fit: pack non-secure uboot.img && boot.img
+		'' | loader | trust | uboot | debug* | itb | env | fit | map | sym | elf* | nm)
+			if [ "$2" == "spl" -o "$2" == "tpl" ]; then
+				ARG_TSPL=$2
 				shift 1
-				;;
-			--no-uboot) # FIT: pack uboot.img without u-boot
-				ARG_NO_UBOOT="y"
-				shift 1
-				;;
-			--idblock)  # pack idblock.bin
-				shift 1
-				;;
-			--tpl|tpl)  # use tpl file
-				ARG_TPL_BIN="tpl/u-boot-tpl.bin"
-				shift 1
-				;;
-			--spl|spl*) # use spl file
-				ARG_SPL_BIN="spl/u-boot-spl.bin"
-				shift 1
-				;;
-			--uboot|--fdt|--optee|--mcu|--bl31) # uboot.img components
-				mkdir -p ${REP_DIR}
-				if [ ! -f $2 ]; then
-					echo "ERROR: No $2"
+			fi
+			shift 1
+			;;
+		# trust/loader ini files for packing trust.img/loader.img
+		*.ini | *.INI)
+			if [ ! -f $1 ]; then
+				echo "ERROR: No $1"
+			fi
+			if grep -q 'CODE471_OPTION' $1; then
+				ARG_INI_LOADER=$1
+			elif grep -Eq ''BL31_OPTION'|'TOS'' $1; then
+				ARG_INI_TRUST=$1
+			fi
+			shift 1
+			;;
+		--sz-trust) # set trust size
+			ARG_TRUST_SIZE="--size $2 $3"
+			shift 3
+			;;
+		--sz-uboot) # set uboot size
+			ARG_UBOOT_SIZE="--size $2 $3"
+			shift 3
+			;;
+		--raw-compile) # FIT: build but not pack image
+			ARG_RAW_COMPILE="y"
+			shift 1
+			;;
+		--no-uboot) # FIT: pack uboot.img without u-boot
+			ARG_NO_UBOOT="y"
+			shift 1
+			;;
+		--idblock) # pack idblock.bin
+			shift 1
+			;;
+		--tpl | tpl) # use tpl file
+			ARG_TPL_BIN="tpl/u-boot-tpl.bin"
+			shift 1
+			;;
+		--spl | spl*) # use spl file
+			ARG_SPL_BIN="spl/u-boot-spl.bin"
+			shift 1
+			;;
+		--uboot | --fdt | --optee | --mcu | --bl31) # uboot.img components
+			mkdir -p ${REP_DIR}
+			if [ ! -f $2 ]; then
+				echo "ERROR: No $2"
+				exit 1
+			fi
+			if [ "$1" == "--uboot" ]; then
+				cp $2 ${REP_DIR}/u-boot-nodtb.bin
+			elif [ "$1" == "--fdt" ]; then
+				cp $2 ${REP_DIR}/u-boot.dtb
+			elif [ "$1" == "--optee" ]; then
+				cp $2 ${REP_DIR}/tee.bin
+			elif [ "$1" == "--mcu" ]; then
+				cp $2 ${REP_DIR}/mcu.bin
+			elif [ "$1" == "--bl31" ]; then
+				if ! file $2 | grep 'ELF ' >/dev/null 2>&1; then
+					echo "ERROR: $2 is not a bl31.elf file"
 					exit 1
 				fi
-				if [ "$1" == "--uboot" ]; then
-					cp $2 ${REP_DIR}/u-boot-nodtb.bin
-				elif [ "$1" == "--fdt" ]; then
-					cp $2 ${REP_DIR}/u-boot.dtb
-				elif [ "$1" == "--optee" ]; then
-					cp $2 ${REP_DIR}/tee.bin
-				elif [ "$1" == "--mcu" ]; then
-					cp $2 ${REP_DIR}/mcu.bin
-				elif [ "$1" == "--bl31" ]; then
-					if ! file $2 | grep 'ELF ' >/dev/null 2>&1 ; then
-						echo "ERROR: $2 is not a bl31.elf file"
-						exit 1
-					fi
-					cp $2 ${REP_DIR}/bl31.elf
-				fi
-				shift 2
-				;;
-			*)
-				#1. FIT scripts args
-				NUM=$(${SCRIPT_FIT} --args $1)
-				if  [ ${NUM} -ne 0 ]; then
-					[ ${NUM} -eq 1 ] && ARG_LIST_FIT="${ARG_LIST_FIT} $1"
-					[ ${NUM} -eq 2 ] && ARG_LIST_FIT="${ARG_LIST_FIT} $1 $2"
-					shift ${NUM}
-					continue
-				#2. unwind function address
-				elif [ -z $(echo $1 | sed 's/[0-9,a-f,A-F,x,X,-]//g') ]; then
-					ARG_FUNCADDR=$1
-				#3. make defconfig
+				cp $2 ${REP_DIR}/bl31.elf
+			fi
+			shift 2
+			;;
+		*)
+			#1. FIT scripts args
+			NUM=$(${SCRIPT_FIT} --args $1)
+			if [ ${NUM} -ne 0 ]; then
+				[ ${NUM} -eq 1 ] && ARG_LIST_FIT="${ARG_LIST_FIT} $1"
+				[ ${NUM} -eq 2 ] && ARG_LIST_FIT="${ARG_LIST_FIT} $1 $2"
+				shift ${NUM}
+				continue
+			#2. unwind function address
+			elif [ -z $(echo $1 | sed 's/[0-9,a-f,A-F,x,X,-]//g') ]; then
+				ARG_FUNCADDR=$1
+			#3. make defconfig
+			else
+				ARG_BOARD=$1
+				if [ ! -f configs/${ARG_BOARD}_defconfig -a ! -f configs/${ARG_BOARD}.config ]; then
+					echo -e "\n${SUPPORT_LIST}\n"
+					echo "ERROR: No configs/${ARG_BOARD}_defconfig"
+					exit 1
+				elif [ -f configs/${ARG_BOARD}.config ]; then
+					BASE1_DEFCONFIG=$(filt_val "CONFIG_BASE_DEFCONFIG" configs/${ARG_BOARD}.config)
+					BASE0_DEFCONFIG=$(filt_val "CONFIG_BASE_DEFCONFIG" configs/${BASE1_DEFCONFIG})
+					MAKE_CMD="make ${BASE0_DEFCONFIG} ${BASE1_DEFCONFIG} ${ARG_BOARD}.config -j${JOB}"
+					echo "## ${MAKE_CMD}"
+					make ${BASE0_DEFCONFIG} ${BASE1_DEFCONFIG} ${ARG_BOARD}.config ${OPTION}
+					rm -f ${CC_FILE}
 				else
-					ARG_BOARD=$1
-					if [ ! -f configs/${ARG_BOARD}_defconfig -a ! -f configs/${ARG_BOARD}.config ]; then
-						echo -e "\n${SUPPORT_LIST}\n"
-						echo "ERROR: No configs/${ARG_BOARD}_defconfig"
-						exit 1
-					elif [ -f configs/${ARG_BOARD}.config ]; then
-						BASE1_DEFCONFIG=`filt_val "CONFIG_BASE_DEFCONFIG" configs/${ARG_BOARD}.config`
-						BASE0_DEFCONFIG=`filt_val "CONFIG_BASE_DEFCONFIG" configs/${BASE1_DEFCONFIG}`
-						MAKE_CMD="make ${BASE0_DEFCONFIG} ${BASE1_DEFCONFIG} ${ARG_BOARD}.config -j${JOB}"
-						echo "## ${MAKE_CMD}"
-						make ${BASE0_DEFCONFIG} ${BASE1_DEFCONFIG} ${ARG_BOARD}.config ${OPTION}
-						rm -f ${CC_FILE}
-					else
-						MAKE_CMD="make ${ARG_BOARD}_defconfig -j${JOB}"
-						echo "## ${MAKE_CMD}"
-						make ${ARG_BOARD}_defconfig ${OPTION}
-						rm -f ${CC_FILE}
-					fi
+					MAKE_CMD="make ${ARG_BOARD}_defconfig -j${JOB}"
+					echo "## ${MAKE_CMD}"
+					make ${ARG_BOARD}_defconfig ${OPTION}
+					rm -f ${CC_FILE}
 				fi
-				shift 1
-				;;
+			fi
+			shift 1
+			;;
 		esac
 	done
 
@@ -260,9 +259,8 @@ function process_args()
 	fi
 }
 
-function select_toolchain()
-{
-	if grep -q '^CONFIG_ARM64=y' .config ; then
+function select_toolchain() {
+	if grep -q '^CONFIG_ARM64=y' .config; then
 		TOOLCHAIN=${CROSS_COMPILE_ARM64}
 		TOOLCHAIN_NM=${CROSS_COMPILE_ARM64}nm
 		TOOLCHAIN_OBJDUMP=${CROSS_COMPILE_ARM64}objdump
@@ -274,14 +272,14 @@ function select_toolchain()
 		TOOLCHAIN_ADDR2LINE=${CROSS_COMPILE_ARM32}addr2line
 	fi
 
-	if [ ! `which ${TOOLCHAIN}gcc` ]; then
+	if [ ! $(which ${TOOLCHAIN}gcc) ]; then
 		echo "ERROR: Could not find ${TOOLCHAIN}gcc"
 		exit 1
 	fi
 
 	# save to CC_FILE
 	if [ "${ARG_COMPILE}" == "y" ]; then
-		echo "${TOOLCHAIN}" > ${CC_FILE}
+		echo "${TOOLCHAIN}" >${CC_FILE}
 	fi
 }
 
@@ -292,35 +290,33 @@ function select_toolchain()
 #	3. RKCHIP_TRUST:  search ini file to pack trust
 #	4. RKCHIP_LABEL:  show build message
 #
-function select_chip_info()
-{
+function select_chip_info() {
 	# Read RKCHIP firstly from .config
 	# The regular expression that matching:
 	#  - PX30, PX3SE
 	#  - RK????, RK????X
 	#  - RV????
 	CHIP_PATTERN='^CONFIG_ROCKCHIP_[R,P][X,V,K][0-9ESX]{1,5}'
-	RKCHIP=`egrep -o ${CHIP_PATTERN} .config`
+	RKCHIP=$(egrep -o ${CHIP_PATTERN} .config)
 
 	# default
 	RKCHIP=${RKCHIP##*_}
 	RKCHIP_LOADER=${RKCHIP}
 	RKCHIP_TRUST=${RKCHIP}
-	RKCHIP_LABEL=`filt_val "CONFIG_CHIP_NAME" .config`
+	RKCHIP_LABEL=$(filt_val "CONFIG_CHIP_NAME" .config)
 	if [ -z "${RKCHIP_LABEL}" ]; then
 		RKCHIP_LABEL=${RKCHIP}
 	fi
 }
 
 # Priority: default < CHIP_CFG_FIXUP_TABLE() < make.sh args
-function fixup_platform_configure()
-{
-	U_KB=`filt_val "CONFIG_UBOOT_SIZE_KB" .config`
-	U_NUM=`filt_val "CONFIG_UBOOT_NUM" .config`
-	T_KB=`filt_val "CONFIG_TRUST_SIZE_KB" .config`
-	T_NUM=`filt_val "CONFIG_TRUST_NUM" .config`
-	SHA=`filt_val "CONFIG_TRUST_SHA_MODE" .config`
-	RSA=`filt_val "CONFIG_TRUST_RSA_MODE" .config`
+function fixup_platform_configure() {
+	U_KB=$(filt_val "CONFIG_UBOOT_SIZE_KB" .config)
+	U_NUM=$(filt_val "CONFIG_UBOOT_NUM" .config)
+	T_KB=$(filt_val "CONFIG_TRUST_SIZE_KB" .config)
+	T_NUM=$(filt_val "CONFIG_TRUST_NUM" .config)
+	SHA=$(filt_val "CONFIG_TRUST_SHA_MODE" .config)
+	RSA=$(filt_val "CONFIG_TRUST_RSA_MODE" .config)
 
 	# .config
 	PLAT_UBOOT_SIZE="--size ${U_KB} ${U_NUM}"
@@ -337,8 +333,7 @@ function fixup_platform_configure()
 	fi
 }
 
-function select_ini_file()
-{
+function select_ini_file() {
 	# default
 	INI_LOADER=${RKBIN}/RKBOOT/${RKCHIP_LOADER}MINIALL.ini
 	if [ "${ARM64_TRUSTZONE}" == "y" ]; then
@@ -348,11 +343,11 @@ function select_ini_file()
 	fi
 
 	# defconfig
-	NAME=`filt_val "CONFIG_LOADER_INI" .config`
+	NAME=$(filt_val "CONFIG_LOADER_INI" .config)
 	if [ ! -z "${NAME}" ]; then
 		INI_LOADER=${RKBIN}/RKBOOT/${NAME}
 	fi
-	NAME=`filt_val "CONFIG_TRUST_INI" .config`
+	NAME=$(filt_val "CONFIG_TRUST_INI" .config)
 	if [ ! -z "${NAME}" ]; then
 		INI_TRUST=${RKBIN}/RKTRUST/${NAME}
 	fi
@@ -366,8 +361,7 @@ function select_ini_file()
 	fi
 }
 
-function sub_commands()
-{
+function sub_commands() {
 	# skip "--" parameter, such as "--rollback-index-..."
 	if [[ ${CMD_ARGS} != --* ]]; then
 		CMD=${CMD_ARGS%-*}
@@ -377,9 +371,9 @@ function sub_commands()
 	fi
 
 	if [ "${ARG_TSPL}" == "tpl" -o "${ARG_TSPL}" == "spl" ]; then
-		ELF=`find -name u-boot-${ARG_TSPL}`
-		MAP=`find -name u-boot-${ARG_TSPL}.map`
-		SYM=`find -name u-boot-${ARG_TSPL}.sym`
+		ELF=$(find -name u-boot-${ARG_TSPL})
+		MAP=$(find -name u-boot-${ARG_TSPL}.map)
+		SYM=$(find -name u-boot-${ARG_TSPL}.sym)
 	else
 		ELF=u-boot
 		MAP=u-boot.map
@@ -387,93 +381,92 @@ function sub_commands()
 	fi
 
 	case ${CMD} in
-		elf|nm)
-			if [ "${CMD}" == "nm" ]; then
-				echo -e "\n${ELF}:     file format elf\n"
-				${TOOLCHAIN_NM} -r --size ${ELF} | grep -iv 'b' | less
-			else
-				if [ "${CMD}" == "elf" -a "${ARG}" == "elf" ]; then
-					ARG=D # default
-				fi
-				${TOOLCHAIN_OBJDUMP} -${ARG} ${ELF} | less
+	elf | nm)
+		if [ "${CMD}" == "nm" ]; then
+			echo -e "\n${ELF}:     file format elf\n"
+			${TOOLCHAIN_NM} -r --size ${ELF} | grep -iv 'b' | less
+		else
+			if [ "${CMD}" == "elf" -a "${ARG}" == "elf" ]; then
+				ARG=D # default
 			fi
-			exit 0
-			;;
-		map|sym)
-			if [ ${CMD} == "map" ]; then
-				cat ${MAP} | less
-			else
-				cat ${SYM} | less
-			fi
-			exit 0
-			;;
-		debug)
-			./scripts/rkpatch.sh ${ARG}
-			exit 0
-			;;
-		fit)
-			# Non-secure
-			${SCRIPT_FIT} --boot_img_dir images/ ${ARG_LIST_FIT}
-			exit 0
-			;;
-		uboot)
-			pack_uboot_image
-			exit 0
-			;;
-		trust)
-			pack_trust_image
-			exit 0
-			;;
-		loader)
-			pack_loader_image
-			exit 0
-			;;
-		itb)
-			pack_uboot_itb_image
-			exit 0
-			;;
-		env)
-			make CROSS_COMPILE=${TOOLCHAIN} envtools
-			exit 0
-			;;
-		--idblock)
-			pack_idblock
-			exit 0
-			;;
-		--tpl|--spl|tpl|spl)
-			pack_spl_loader_image
-			exit 0
-			;;
-		*)
-			unwind_addr_or_continue
-			;;
+			${TOOLCHAIN_OBJDUMP} -${ARG} ${ELF} | less
+		fi
+		exit 0
+		;;
+	map | sym)
+		if [ ${CMD} == "map" ]; then
+			cat ${MAP} | less
+		else
+			cat ${SYM} | less
+		fi
+		exit 0
+		;;
+	debug)
+		./scripts/rkpatch.sh ${ARG}
+		exit 0
+		;;
+	fit)
+		# Non-secure
+		${SCRIPT_FIT} --boot_img_dir images/ ${ARG_LIST_FIT}
+		exit 0
+		;;
+	uboot)
+		pack_uboot_image
+		exit 0
+		;;
+	trust)
+		pack_trust_image
+		exit 0
+		;;
+	loader)
+		pack_loader_image
+		exit 0
+		;;
+	itb)
+		pack_uboot_itb_image
+		exit 0
+		;;
+	env)
+		make CROSS_COMPILE=${TOOLCHAIN} envtools
+		exit 0
+		;;
+	--idblock)
+		pack_idblock
+		exit 0
+		;;
+	--tpl | --spl | tpl | spl)
+		pack_spl_loader_image
+		exit 0
+		;;
+	*)
+		unwind_addr_or_continue
+		;;
 	esac
 }
 
-function unwind_addr_or_continue()
-{
+function unwind_addr_or_continue() {
 	FUNCADDR=${ARG_FUNCADDR}
 	RELOCOFF=${FUNCADDR#*-}
 	FUNCADDR=${FUNCADDR%-*}
 
 	if [ -z $(echo ${FUNCADDR} | sed 's/[0-9,a-f,A-F,x,X,-]//g') ] && [ ${FUNCADDR} ]; then
 		# With prefix: '0x' or '0X'
-		if [ `echo ${FUNCADDR} | sed -n "/0[x,X]/p" | wc -l` -ne 0 ]; then
-			FUNCADDR=`echo ${FUNCADDR} | awk '{ print strtonum($0) }'`
-			FUNCADDR=`echo "obase=16;${FUNCADDR}"|bc | tr '[A-Z]' '[a-z]'`
+		if [ $(echo ${FUNCADDR} | sed -n "/0[x,X]/p" | wc -l) -ne 0 ]; then
+			FUNCADDR=$(echo ${FUNCADDR} | awk '{ print strtonum($0) }')
+			FUNCADDR=$(echo "obase=16;${FUNCADDR}" | bc | tr '[A-Z]' '[a-z]')
 		fi
-		if [ `echo ${RELOCOFF} | sed -n "/0[x,X]/p" | wc -l` -ne 0 ] && [ ${RELOCOFF} ]; then
-			RELOCOFF=`echo ${RELOCOFF} | awk '{ print strtonum($0) }'`
-			RELOCOFF=`echo "obase=16;${RELOCOFF}"|bc | tr '[A-Z]' '[a-z]'`
+		if [ $(echo ${RELOCOFF} | sed -n "/0[x,X]/p" | wc -l) -ne 0 ] && [ ${RELOCOFF} ]; then
+			RELOCOFF=$(echo ${RELOCOFF} | awk '{ print strtonum($0) }')
+			RELOCOFF=$(echo "obase=16;${RELOCOFF}" | bc | tr '[A-Z]' '[a-z]')
 		fi
 
 		# If reloc address is assigned, do sub
 		if [ "${FUNCADDR}" != "${RELOCOFF}" ]; then
 			# Hex -> Dec -> SUB -> Hex
-			FUNCADDR=`echo $((16#${FUNCADDR}))`
-			RELOCOFF=`echo $((16#${RELOCOFF}))`
-			FUNCADDR=$((FUNCADDR-RELOCOFF))
-			FUNCADDR=$(echo "obase=16;${FUNCADDR}"|bc | tr '[A-Z]' '[a-z]')
+			FUNCADDR=$(echo $((16#${FUNCADDR})))
+			RELOCOFF=$(echo $((16#${RELOCOFF})))
+			FUNCADDR=$((FUNCADDR - RELOCOFF))
+			FUNCADDR=$(echo "obase=16;${FUNCADDR}" | bc | tr '[A-Z]' '[a-z]')
 		fi
 
 		echo
@@ -483,8 +476,7 @@ function unwind_addr_or_continue()
 	fi
 }
 
-function pack_idblock()
-{
+function pack_idblock() {
 	INI=${INI_LOADER}
 	if [ ! -f ${INI} ]; then
 		echo "ERROR: No ${INI}"
@@ -492,12 +484,12 @@ function pack_idblock()
 	fi
 
 	# chip
-	COMMON_H=`grep "_common.h:" include/autoconf.mk.dep | awk -F "/" '{ printf $3 }'`
+	COMMON_H=$(grep "_common.h:" include/autoconf.mk.dep | awk -F "/" '{ printf $3 }')
 	PLAT=${COMMON_H%_*}
 
 	# file
-	SPL_BIN=${RKBIN}/`filt_val "FlashBoot" ${INI}`
-	TPL_BIN=${RKBIN}/`filt_val "FlashData" ${INI}`
+	SPL_BIN=${RKBIN}/$(filt_val "FlashBoot" ${INI})
+	TPL_BIN=${RKBIN}/$(filt_val "FlashData" ${INI})
 	if [ ! -z "${ARG_SPL_BIN}" ]; then
 		SPL_BIN=${ARG_SPL_BIN}
 	fi
@@ -517,8 +509,7 @@ function pack_idblock()
 	echo
 }
 
-function pack_uboot_itb_image()
-{
+function pack_uboot_itb_image() {
 	INI=${INI_TRUST}
 	if [ ! -f ${INI} ]; then
 		echo "ERROR: No ${INI}"
@@ -526,28 +517,28 @@ function pack_uboot_itb_image()
 	fi
 
 	if [ "${ARM64_TRUSTZONE}" == "y" ]; then
-		BL31_ELF=`sed -n '/_bl31_/s/PATH=//p' ${INI} | tr -d '\r'`
-		BL32_BIN=`sed -n '/_bl32_/s/PATH=//p' ${INI} | tr -d '\r'`
+		BL31_ELF=$(sed -n '/_bl31_/s/PATH=//p' ${INI} | tr -d '\r')
+		BL32_BIN=$(sed -n '/_bl32_/s/PATH=//p' ${INI} | tr -d '\r')
 		rm bl31.elf tee.bin -rf
 		cp ${RKBIN}/${BL31_ELF} bl31.elf
-		if grep BL32_OPTION -A 1 ${INI} | grep SEC=1 ; then
+		if grep BL32_OPTION -A 1 ${INI} | grep SEC=1; then
 			cp ${RKBIN}/${BL32_BIN} tee.bin
-			TEE_OFFSET=`grep BL32_OPTION -A 3 ${INI} | grep ADDR= | awk -F "=" '{ printf $2 }' | tr -d '\r'`
+			TEE_OFFSET=$(grep BL32_OPTION -A 3 ${INI} | grep ADDR= | awk -F "=" '{ printf $2 }' | tr -d '\r')
 			TEE_ARG="-t ${TEE_OFFSET}"
 		fi
 	else
 		# TOS
-		TOS=`filt_val "TOS" ${INI}`
-		TOSTA=`filt_val "TOSTA" ${INI}`
+		TOS=$(filt_val "TOS" ${INI})
+		TOSTA=$(filt_val "TOSTA" ${INI})
 		if [ ! -z "${TOSTA}" ]; then
 			cp ${RKBIN}/${TOSTA} tee.bin
 		elif [ ! -z "${TOS}" ]; then
-			cp ${RKBIN}/${TOS}   tee.bin
+			cp ${RKBIN}/${TOS} tee.bin
 		else
 			echo "WARN: No tee bin"
 		fi
 		if [ ! -z "${TOSTA}" -o ! -z "${TOS}" ]; then
-			TEE_OFFSET=`filt_val "ADDR" ${INI}`
+			TEE_OFFSET=$(filt_val "ADDR" ${INI})
 			if [ "${TEE_OFFSET}" == "" ]; then
 				TEE_OFFSET=0x8400000
 			fi
@@ -556,24 +547,23 @@ function pack_uboot_itb_image()
 	fi
 
 	# MCUs
-	for ((i=0; i<5; i++))
-	do
+	for ((i = 0; i < 5; i++)); do
 		MCU_BIN="mcu${i}.bin"
 		MCU_IDX="MCU${i}"
 
 		# compatible: use "MCU" to replace "MCU0" if "MCU" is present.
-		ENABLED=`awk -F"," '/MCU=/  { printf $3 }' ${INI} | tr -d ' '`
+		ENABLED=$(awk -F"," '/MCU=/  { printf $3 }' ${INI} | tr -d ' ')
 		if [ ${i} -eq 0 ]; then
-			ENABLED=`awk -F"," '/MCU=/  { printf $3 }' ${INI} | tr -d ' '`
+			ENABLED=$(awk -F"," '/MCU=/  { printf $3 }' ${INI} | tr -d ' ')
 			if [ ! -z ${ENABLED} ]; then
 				MCU_IDX="MCU"
 			fi
 		fi
 
-		ENABLED=`awk -F "," '/'${MCU_IDX}'=/  { printf $3 }' ${INI} | tr -d ' '`
+		ENABLED=$(awk -F "," '/'${MCU_IDX}'=/  { printf $3 }' ${INI} | tr -d ' ')
 		if [ "${ENABLED}" == "enabled" -o "${ENABLED}" == "okay" ]; then
-			NAME=`awk -F "," '/'${MCU_IDX}'=/ { printf $1 }' ${INI} | tr -d ' ' | awk -F "=" '{ print $2 }'`
-			OFFS=`awk -F "," '/'${MCU_IDX}'=/ { printf $2 }' ${INI} | tr -d ' '`
+			NAME=$(awk -F "," '/'${MCU_IDX}'=/ { printf $1 }' ${INI} | tr -d ' ' | awk -F "=" '{ print $2 }')
+			OFFS=$(awk -F "," '/'${MCU_IDX}'=/ { printf $2 }' ${INI} | tr -d ' ')
 			cp ${RKBIN}/${NAME} ${MCU_BIN}
 			if [ -z ${OFFS} ]; then
 				echo "ERROR: No ${MCU_BIN} address in ${INI}"
@@ -584,14 +574,13 @@ function pack_uboot_itb_image()
 	done
 
 	# Loadables
-	for ((i=0; i<5; i++))
-	do
+	for ((i = 0; i < 5; i++)); do
 		LOAD_BIN="load${i}.bin"
 		LOAD_IDX="LOAD${i}"
-		ENABLED=`awk -F "," '/'${LOAD_IDX}'=/  { printf $3 }' ${INI} | tr -d ' '`
+		ENABLED=$(awk -F "," '/'${LOAD_IDX}'=/  { printf $3 }' ${INI} | tr -d ' ')
 		if [ "${ENABLED}" == "enabled" -o "${ENABLED}" == "okay" ]; then
-			NAME=`awk -F "," '/'${LOAD_IDX}'=/ { printf $1 }' ${INI} | tr -d ' ' | awk -F "=" '{ print $2 }'`
-			OFFS=`awk -F "," '/'${LOAD_IDX}'=/ { printf $2 }' ${INI} | tr -d ' '`
+			NAME=$(awk -F "," '/'${LOAD_IDX}'=/ { printf $1 }' ${INI} | tr -d ' ' | awk -F "=" '{ print $2 }')
+			OFFS=$(awk -F "," '/'${LOAD_IDX}'=/ { printf $2 }' ${INI} | tr -d ' ')
 			cp ${RKBIN}/${NAME} ${LOAD_BIN}
 			if [ -z ${OFFS} ]; then
 				echo "ERROR: No ${LOAD_BIN} address in ${INI}"
@@ -602,7 +591,7 @@ function pack_uboot_itb_image()
 	done
 
 	# COMPRESSION
-	COMPRESSION=`awk -F"," '/COMPRESSION=/  { printf $1 }' ${INI} | tr -d ' ' | cut -c 13-`
+	COMPRESSION=$(awk -F"," '/COMPRESSION=/  { printf $1 }' ${INI} | tr -d ' ' | cut -c 13-)
 	if [ ! -z "${COMPRESSION}" -a "${COMPRESSION}" != "none" ]; then
 		COMPRESSION_ARG="-c ${COMPRESSION}"
 	fi
@@ -611,16 +600,16 @@ function pack_uboot_itb_image()
 		mv ${REP_DIR}/* ./
 	fi
 
-	SPL_FIT_SOURCE=`filt_val "CONFIG_SPL_FIT_SOURCE" .config`
+	SPL_FIT_SOURCE=$(filt_val "CONFIG_SPL_FIT_SOURCE" .config)
 	if [ ! -z ${SPL_FIT_SOURCE} ]; then
 		cp ${SPL_FIT_SOURCE} u-boot.its
 	else
-		SPL_FIT_GENERATOR=`filt_val "CONFIG_SPL_FIT_GENERATOR" .config`
+		SPL_FIT_GENERATOR=$(filt_val "CONFIG_SPL_FIT_GENERATOR" .config)
 		# *.py is the legacy one.
 		if [[ ${SPL_FIT_GENERATOR} == *.py ]]; then
-			${SPL_FIT_GENERATOR} u-boot.dtb > u-boot.its
+			${SPL_FIT_GENERATOR} u-boot.dtb >u-boot.its
 		else
-			${SPL_FIT_GENERATOR} ${TEE_ARG} ${COMPRESSION_ARG} ${MCU_ARG} ${LOAD_ARG} > u-boot.its
+			${SPL_FIT_GENERATOR} ${TEE_ARG} ${COMPRESSION_ARG} ${MCU_ARG} ${LOAD_ARG} >u-boot.its
 		fi
 	fi
 
@@ -629,12 +618,11 @@ function pack_uboot_itb_image()
 	echo
 }
 
-function pack_spl_loader_image()
-{
+function pack_spl_loader_image() {
 	rm -f *loader*.bin *download*.bin *idblock*.img
 	cd ${RKBIN}
-	DEF_PATH=${RKBIN}/`filt_val "^PATH" ${INI_LOADER}`
-	IDB_PATH=${RKBIN}/`filt_val "IDB_PATH" ${INI_LOADER}`
+	DEF_PATH=${RKBIN}/$(filt_val "^PATH" ${INI_LOADER})
+	IDB_PATH=${RKBIN}/$(filt_val "IDB_PATH" ${INI_LOADER})
 	if [ ! -z "${ARG_SPL_BIN}" -a ! -z "${ARG_TPL_BIN}" ]; then
 		${SCRIPT_SPL} --ini ${INI_LOADER} --tpl ${SRCTREE}/${ARG_TPL_BIN} --spl ${SRCTREE}/${ARG_SPL_BIN}
 	elif [ ! -z "${ARG_TPL_BIN}" ]; then
@@ -651,29 +639,27 @@ function pack_spl_loader_image()
 	fi
 }
 
-function pack_uboot_image()
-{
+function pack_uboot_image() {
 	rm u-boot.img u-boot-dtb.img -f
-	LOAD_ADDR=`sed -n "/CONFIG_SYS_TEXT_BASE=/s/CONFIG_SYS_TEXT_BASE=//p" include/autoconf.mk|tr -d '\r'`
+	LOAD_ADDR=$(sed -n "/CONFIG_SYS_TEXT_BASE=/s/CONFIG_SYS_TEXT_BASE=//p" include/autoconf.mk | tr -d '\r')
 	if [ -z "${LOAD_ADDR}" ]; then
 		# upstream U-Boot
-		LOAD_ADDR=`grep CONFIG_SYS_TEXT_BASE include/generated/autoconf.h | awk '{ print $3 }' | tr -d '\r'`
+		LOAD_ADDR=$(grep CONFIG_SYS_TEXT_BASE include/generated/autoconf.h | awk '{ print $3 }' | tr -d '\r')
 	fi
 
 	if [ -z "${LOAD_ADDR}" ]; then
-		echo "ERROR: No CONFIG_SYS_TEXT_BASE for u-boot";
+		echo "ERROR: No CONFIG_SYS_TEXT_BASE for u-boot"
 		exit 1
 	fi
 
 	${SCRIPT_UBOOT} --load ${LOAD_ADDR} ${PLAT_UBOOT_SIZE}
 }
 
-function pack_loader_image()
-{
+function pack_loader_image() {
 	rm -f *loader*.bin *download*.bin *idblock*.img
 	cd ${RKBIN}
-	DEF_PATH=${RKBIN}/`filt_val "^PATH" ${INI_LOADER}`
-	IDB_PATH=${RKBIN}/`filt_val "IDB_PATH" ${INI_LOADER}`
+	DEF_PATH=${RKBIN}/$(filt_val "^PATH" ${INI_LOADER})
+	IDB_PATH=${RKBIN}/$(filt_val "IDB_PATH" ${INI_LOADER})
 	${SCRIPT_LOADER} --ini ${INI_LOADER}
 	cd -
 	if [ -f ${DEF_PATH} ]; then
@@ -684,9 +670,8 @@ function pack_loader_image()
 	fi
 }
 
-function pack_trust_image()
-{
-	DRAM_BASE=`filt_val "CONFIG_SYS_SDRAM_BASE" include/autoconf.mk`
+function pack_trust_image() {
+	DRAM_BASE=$(filt_val "CONFIG_SYS_SDRAM_BASE" include/autoconf.mk)
 
 	rm trust*.img -f
 	cd ${RKBIN}
@@ -701,10 +686,9 @@ function pack_trust_image()
 	fi
 }
 
-function pack_fit_image()
-{
+function pack_fit_image() {
 	# check host tools
-	if ! which dtc >/dev/null 2>&1 ; then
+	if ! which dtc >/dev/null 2>&1; then
 		echo "ERROR: No 'dtc', please: apt-get install device-tree-compiler"
 		exit 1
 	fi
@@ -722,19 +706,16 @@ function pack_fit_image()
 	echo "pack uboot.img okay! Input: ${INI_TRUST}"
 }
 
-function handle_args_late()
-{
+function handle_args_late() {
 	ARG_LIST_FIT="${ARG_LIST_FIT} --ini-trust ${INI_TRUST} --ini-loader ${INI_LOADER}"
 }
 
-function clean_files()
-{
+function clean_files() {
 	rm spl/u-boot-spl.dtb tpl/u-boot-tpl.dtb u-boot.dtb -f
 	rm spl/u-boot-spl tpl/u-boot-tpl u-boot -f
 }
 
-function pack_images()
-{
+function pack_images() {
 	if [ "${ARG_RAW_COMPILE}" != "y" ]; then
 		if [ "${PLAT_TYPE}" == "FIT" ]; then
 			pack_fit_image ${ARG_LIST_FIT}
@@ -748,8 +729,7 @@ function pack_images()
 	fi
 }
 
-function finish()
-{
+function finish() {
 	# check special config
 	${SCRIPT_CHECKCONFIG}
 
