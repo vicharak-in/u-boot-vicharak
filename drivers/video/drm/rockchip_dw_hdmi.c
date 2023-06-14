@@ -398,9 +398,6 @@ void drm_rk_selete_output(struct hdmi_edid_data *edid_data,
 	screen_info->feature = screen_info2->feature;
 #else
 	if (!base2_parameter) {
-#ifdef CONFIG_TARGET_RK3399_VAAMAN
-		goto null_basep;
-#endif
 		dev_desc = rockchip_get_bootdev();
 		if (!dev_desc) {
 			printf("%s: Could not find device\n", __func__);
@@ -413,7 +410,6 @@ void drm_rk_selete_output(struct hdmi_edid_data *edid_data,
 			printf("Could not find baseparameter partition\n");
 			goto null_basep;
 		}
-
 
 read_aux:
 		ret = blk_dread(dev_desc, part_info.start + offset, 1,

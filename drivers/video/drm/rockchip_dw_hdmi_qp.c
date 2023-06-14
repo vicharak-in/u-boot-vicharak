@@ -943,9 +943,6 @@ void dw_hdmi_qp_selete_output(struct hdmi_edid_data *edid_data,
 		*bus_format = MEDIA_BUS_FMT_YUV8_1X24;
 
 	if (!base2_parameter) {
-#ifdef CONFIG_TARGET_RK3588_AXON
-		goto null_basep;
-#endif
 		dev_desc = rockchip_get_bootdev();
 		if (!dev_desc) {
 			printf("%s: Could not find device\n", __func__);

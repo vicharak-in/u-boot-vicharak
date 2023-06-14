@@ -31,7 +31,6 @@
 #include "rockchip_bridge.h"
 #include "rockchip_phy.h"
 #include "rockchip_panel.h"
-#include "logo.h"
 #include <dm.h>
 #include <dm/of_access.h>
 #include <dm/ofnode.h>
@@ -84,9 +83,6 @@ int rockchip_get_baseparameter(void)
 	int block_num = 2048;
 	char baseparameter_buf[block_num * RK_BLK_SIZE] __aligned(ARCH_DMA_MINALIGN);
 	int ret = 0;
-
-	// Do not read baseparameter
-	return -ENOENT;
 
 	dev_desc = rockchip_get_bootdev();
 	if (!dev_desc) {
@@ -1145,23 +1141,6 @@ static int load_kernel_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	return 0;
 }
 
-int logo_load_mem(char *filename, unsigned long addr, int size, int *len)
-{
-	if (!strcmp(filename, "logo.bmp")) {
-		memcpy((void *)addr, &logo_bmp[0], size);
-		*len = size;
-		return 0;
-	}
-
-	if (!strcmp(filename, "logo_kernel.bmp")) {
-		memcpy((void *)addr, &logo_bmp[0], size);
-		*len = size;
-		return 0;
-	}
-
-	return -EINVAL;
-}
-
 static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 {
 #ifdef CONFIG_ROCKCHIP_RESOURCE_IMAGE
@@ -1188,19 +1167,11 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 	if (!header)
 		return -ENOMEM;
 
-#if 0
 	len = rockchip_read_resource_file(header, bmp_name, 0, RK_BLK_SIZE);
 	if (len != RK_BLK_SIZE) {
 		ret = -EINVAL;
 		goto free_header;
 	}
-#else
-	ret = logo_load_mem((char *)bmp_name, (unsigned long)header, RK_BLK_SIZE, &len);
-	if (ret) {
-		printf("failed to load bmp %s from memory\n", bmp_name);
-		goto free_header;
-	}
-#endif
 
 	logo->bpp = get_unaligned_le16(&header->bit_count);
 	logo->width = get_unaligned_le32(&header->width);
@@ -1223,20 +1194,12 @@ static int load_bmp_logo(struct logo_info *logo, const char *bmp_name)
 		dst = pdst;
 	}
 
-#if 0
 	len = rockchip_read_resource_file(pdst, bmp_name, 0, size);
 	if (len != size) {
 		printf("failed to load bmp %s\n", bmp_name);
 		ret = -ENOENT;
 		goto free_header;
 	}
-#else
-	ret = logo_load_mem((char *)bmp_name, (unsigned long)pdst, RK_BLK_SIZE, &len);
-	if (ret) {
-		printf("failed to load bmp %s from memory\n", bmp_name);
-		goto free_header;
-	}
-#endif
 
 	if (!can_direct_logo(logo->bpp)) {
 		/*
