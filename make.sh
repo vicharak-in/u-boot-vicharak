@@ -6,14 +6,14 @@
 #
 
 set -e
-JOB=$(nproc)
+JOB=$(sed -n "N;/processor/p" /proc/cpuinfo | wc -l)
 SUPPORT_LIST=$(ls configs/*[r,p][x,v,k][0-9][0-9]*_defconfig)
 CMD_ARGS=$1
 
 ########################################### User can modify #############################################
 RKBIN_TOOLS=rkbin/tools
-CROSS_COMPILE_ARM32=arm-linux-gnueabihf-
-CROSS_COMPILE_ARM64=aarch64-linux-gnu-
+CROSS_COMPILE_ARM32=../prebuilts/gcc/linux-x86/arm/gcc-linaro-6.3.1-2017.05-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-
+CROSS_COMPILE_ARM64=../prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
 ########################################### User not touch #############################################
 # Declare global INI file searching index name for every chip, update in select_chip_info()
 RKCHIP=
@@ -260,6 +260,26 @@ function process_args() {
 }
 
 function select_toolchain() {
+	# If no outer CROSS_COMPILE, look for it from CC_FILE.
+	if [ "${ARG_COMPILE}" != "y" ]; then
+		if [ -f ${CC_FILE} ]; then
+			CROSS_COMPILE_ARM32=$(cat ${CC_FILE})
+			CROSS_COMPILE_ARM64=$(cat ${CC_FILE})
+		else
+			if grep -q '^CONFIG_ARM64=y' .config; then
+				CROSS_COMPILE_ARM64=$(
+					cd $(dirname ${CROSS_COMPILE_ARM64})
+					pwd
+				)"/aarch64-linux-gnu-"
+			else
+				CROSS_COMPILE_ARM32=$(
+					cd $(dirname ${CROSS_COMPILE_ARM32})
+					pwd
+				)"/arm-linux-gnueabihf-"
+			fi
+		fi
+	fi
+
 	if grep -q '^CONFIG_ARM64=y' .config; then
 		TOOLCHAIN=${CROSS_COMPILE_ARM64}
 		TOOLCHAIN_NM=${CROSS_COMPILE_ARM64}nm
@@ -273,7 +293,7 @@ function select_toolchain() {
 	fi
 
 	if [ ! $(which ${TOOLCHAIN}gcc) ]; then
-		echo "ERROR: Could not find ${TOOLCHAIN}gcc"
+		echo "ERROR: No find ${TOOLCHAIN}gcc"
 		exit 1
 	fi
 
