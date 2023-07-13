@@ -200,27 +200,20 @@
 // End of I2C6 }}}
 
 // PCIE: {{{
-// fe190000: Standard SATA only (PCIE20_0)
 &pcie2x1l2 {
 	u-boot,dm-pre-reloc;
-	reset-gpios = <&pca9554 PCA_IOE_2 GPIO_ACTIVE_HIGH>;
-	vpcie3v3-supply = <&vcc3v3_pcie2x1l2>;
 	status = "okay";
 };
 
-// fe170000: (PCIE20_2)
 &pcie2x1l0 {
 	u-boot,dm-pre-reloc;
-	reset-gpios = <&gpio4 RK_PA2 GPIO_ACTIVE_HIGH>;
-	vpcie3v3-supply = <&vcc3v3_pcie2x1l0l1>;
+	reset-gpios = <&gpio4 RK_PA5 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
-// fe180000: (PCIE20_1) Tested sata2
 &pcie2x1l1 {
 	u-boot,dm-pre-reloc;
-	reset-gpios = <&gpio4 RK_PA4 GPIO_ACTIVE_HIGH>;
-	vpcie3v3-supply = <&vcc3v3_pcie2x1l0l1>;
+	reset-gpios = <&gpio4 RK_PA2 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
